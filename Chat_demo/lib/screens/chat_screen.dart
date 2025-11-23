@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
-import '../hive/hive_manager.dart';
+import '../database/database_helper.dart';
 import '../models/message_model.dart';
 import '../services/sync_service.dart';
 
@@ -18,21 +16,41 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final uuid = const Uuid();
-  late Box _box;
+  List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _box = Hive.box('messagesBox');
+    _loadMessages();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _ctrl.dispose();
     super.dispose();
   }
 
-  void sendMessage(String text) {
+  // Load messages from database (ASYNC now!)
+  Future<void> _loadMessages() async {
+    setState(() => _isLoading = true);
+    final messages = await DatabaseHelper.getAllMessages();
+    setState(() {
+      _messages = messages;
+      _isLoading = false;
+    });
+
+    // Scroll to bottom after loading
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  // Send message (ASYNC now!)
+  Future<void> sendMessage(String text) async {
     if (text.trim().isEmpty) return;
     print('📤 Sending message: ${text.trim()}');
     final id = uuid.v4();
@@ -44,10 +62,14 @@ class _ChatScreenState extends State<ChatScreen> {
       timestamp: now,
       isSynced: false,
     );
-    print('💾 Saving to Hive: ${msg.toMap()}');
-    HiveManager.saveMessage(msg.toMap());
+
+    print('💾 Saving to SQLite: ${msg.toMap()}');
+    await DatabaseHelper.saveMessage(msg.toMap());
     _ctrl.clear();
-    print('✅ Message saved to Hive');
+    print('✅ Message saved to SQLite');
+
+    // Reload messages from database
+    await _loadMessages();
 
     // Scroll to bottom after sending
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -61,7 +83,10 @@ class _ChatScreenState extends State<ChatScreen> {
     });
 
     // try to sync right away (if online)
-    SyncService.sync();
+    SyncService.sync().then((_) {
+      // Reload after sync to show updated sync status
+      _loadMessages();
+    });
   }
 
   String _formatTime(String timestamp) {
@@ -204,7 +229,7 @@ class _ChatScreenState extends State<ChatScreen> {
             icon: const Icon(Icons.sync, color: Colors.white),
             onPressed: () async {
               await SyncService.sync();
-              setState(() {});
+              await _loadMessages(); // Reload after sync
             },
             tooltip: 'Sync messages',
           ),
@@ -213,12 +238,10 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: _box.listenable(),
-              builder: (context, Box box, _) {
-                final messages = HiveManager.getAllMessages();
-                if (messages.isEmpty) {
-                  return Center(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _messages.isEmpty
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -245,19 +268,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ],
                     ),
-                  );
-                }
-                return ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final m = messages[index];
-                    return _buildMessageTile(m);
-                  },
-                );
-              },
-            ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final m = _messages[index];
+                      return _buildMessageTile(m);
+                    },
+                  ),
           ),
           Container(
             decoration: BoxDecoration(

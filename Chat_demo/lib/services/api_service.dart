@@ -3,9 +3,14 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   // Use emulator address for local testing:
-  // iOS emulator: localhost or 127.0.0.1
-  // Android emulator: 10.0.2.2
-  static const String base = "http://192.168.18.32:3000";
+  // iOS Simulator: use "http://localhost:3000" or "http://127.0.0.1:3000"
+  // Android Emulator: use "http://10.0.2.2:3000"
+  // Physical Device: use your computer's IP (e.g., "http://192.168.18.32:3000")
+
+  // 👇 Change this based on what you're using:
+  static const String base = "http://localhost:3000"; // ← For iOS Simulator
+  // static const String base = "http://10.0.2.2:3000";  // ← For Android Emulator
+  // static const String base = "http://192.168.18.32:3000";  // ← For Physical Device
 
   // Sync endpoint
   // Expects { localMessages: [...], lastSyncTime: "ISO" }

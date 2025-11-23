@@ -1,19 +1,24 @@
-import 'package:hive/hive.dart';
-import '../hive/hive_manager.dart';
+import '../database/database_helper.dart';
 import 'api_service.dart';
 
 class SyncService {
-  // The last sync time key in Hive
+  // The last sync time key in database
   static const String lastSyncKey = "lastSyncTime";
 
   // Run a full sync:
   // 1) send unsynced local messages to server
-  // 2) get newer server messages and write to Hive
+  // 2) get newer server messages and write to database
   static Future<void> sync() async {
-    final unsynced = HiveManager.getUnsyncedMessages();
-    final box = Hive.box('messagesBox');
+    // Get unsynced messages from database (ASYNC now!)
+    final unsynced = await DatabaseHelper.getUnsyncedMessages();
 
-    final lastSync = box.get(lastSyncKey, defaultValue: "1970-01-01T00:00:00.000Z") as String;
+    // Get last sync time from database
+    final lastSync =
+        await DatabaseHelper.getSetting(
+          lastSyncKey,
+          defaultValue: "1970-01-01T00:00:00.000Z",
+        ) ??
+        "1970-01-01T00:00:00.000Z";
 
     final response = await ApiService.sync(unsynced, lastSync);
     if (response == null) {
@@ -24,27 +29,22 @@ class SyncService {
     // 1) Mark uploaded messages as synced (we optimistically mark because server merged them)
     for (var m in unsynced) {
       final id = m['id'];
-      final existing = box.get(id);
-      if (existing != null) {
-        final updated = Map<String, dynamic>.from(existing as Map);
-        updated['isSynced'] = true;
-        box.put(id, updated);
-      }
+      await DatabaseHelper.markAsSynced(id);
     }
 
-    // 2) Write serverMessages into Hive (serverMessages may include messages we already have)
+    // 2) Write serverMessages into database (serverMessages may include messages we already have)
     final serverMessages = (response['serverMessages'] as List<dynamic>?) ?? [];
     for (var m in serverMessages) {
       if (m is Map) {
         // ensure isSynced true for server-sourced items
         final item = Map<String, dynamic>.from(m as Map);
         item['isSynced'] = true;
-        box.put(item['id'], item);
+        await DatabaseHelper.saveMessage(item);
       }
     }
 
     // 3) update lastSyncTime
     final now = DateTime.now().toUtc().toIso8601String();
-    box.put(lastSyncKey, now);
+    await DatabaseHelper.saveSetting(lastSyncKey, now);
   }
 }
