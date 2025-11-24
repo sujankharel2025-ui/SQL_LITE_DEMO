@@ -1,105 +1,99 @@
-# Offline Chat System
+# 💬 Offline Chat with SQLite
 
-A Flutter mobile chat app with offline-first capabilities. Messages are saved locally and automatically sync with the Node.js backend when online.
+Flutter chat app that works offline. Messages saved in SQLite, auto-sync when online.
 
 ## 📱 Screenshots
 
-![Chat Screen](screenshots/chat_rooom.jpeg)
-![Sync Status](screenshots/online_sync.jpg)
-![Offline Mode](screenshots/offline.jpg)
+| Chat | Synced | Offline |
+|------|--------|---------|
+| ![](screenshots/chat_rooom.jpeg) | ![](screenshots/online_sync.jpg) | ![](screenshots/offline.jpg) |
 
-## ✨ Key Features
+## ✨ Features
 
-- **Offline-First**: Send messages without internet - they sync automatically when online
-- **Auto Sync**: Triggered on message send, network change, or manual sync button
-- **Status Indicators**: 🕐 Clock = pending sync | ✓✓ = synced to server
-- **WhatsApp-Style UI**: Modern gradient bubbles and clean design
-- **Local Storage**: Hive database keeps all messages accessible offline
+- 📴 Works without internet
+- 💾 SQLite database (permanent storage)
+- 🔄 Auto-sync when online
+- ✓✓ Sync status indicators
+- 🎨 WhatsApp-style UI
+
+## 🔄 Hive → SQLite Migration
+
+**Changed:**
+- ❌ Hive (RAM-based) → ✅ SQLite (disk-based)
+- ❌ Sync operations → ✅ Async operations
+- ❌ Auto-refresh UI → ⚠️ Manual refresh
+
+**Why SQLite?**
+- Permanent disk storage
+- Industry standard
+- Better for larger datasets
 
 ## 🏗️ How It Works
 
-1. **Send Message** → Saved to Hive (local DB) with `isSynced: false`
-2. **App Attempts Sync** → Sends unsynced messages to backend
-3. **Server Receives** → Stores in JSON file, marks `isSynced: true`
-4. **Conflict Resolution** → Last-Write-Wins (newest timestamp wins)
-5. **Client Updates** → Marks messages as synced, shows ✓✓ icon
-
-```
-Flutter App (Hive) ←→ HTTP API ←→ Node.js Server (db.json)
-     Offline            Sync          Always On
+```text
+Send Message → Save to SQLite (offline)
+              ↓ (when online)
+            Sync to Server
+              ↓
+         Mark as Synced ✓✓
 ```
 
 ## 📦 Tech Stack
 
-**Frontend (Flutter)**
-- `hive` & `hive_flutter` - Local NoSQL database
-- `http` - API requests
-- `connectivity_plus` - Network monitoring
-- `uuid` - Unique message IDs
-- `intl` - Date formatting
+**Flutter:**
+`sqflite` `path` `path_provider` `http` `connectivity_plus` `uuid` `intl`
 
-**Backend (Node.js)**
-- `express` - Web server
-- `cors` - Cross-origin requests
-- JSON file storage
+**Backend:**
+Node.js + Express + JSON storage
+
+**Database:**
+SQLite with 2 tables: `messages`, `settings`
+
+## 📊 Database Schema
+
+**messages**
+```sql
+id TEXT, text TEXT, sender TEXT, timestamp TEXT, isSynced INTEGER
+```
+
+**settings**
+```sql
+key TEXT, value TEXT
+```
 
 ## 🚀 Quick Start
 
-### 1. Start Backend
+**1. Start Backend**
+
 ```bash
-cd backend
-npm install
-node server.js
-# Server runs on http://localhost:3000
+cd backend && npm install && node server.js
 ```
 
-### 2. Run Flutter App
+**2. Run App**
+
 ```bash
-cd chat_flutter
-flutter pub get
-flutter run
+cd Chat_demo && flutter pub get && flutter run
 ```
 
-### 3. Configure API URL
-In `lib/services/api_service.dart`:
-```dart
-// iOS Simulator
-static const String base = "http://localhost:3000";
+**3. Set API URL** (in `lib/services/api_service.dart`)
 
-// Android Emulator
-// static const String base = "http://10.0.2.2:3000";
-
-// Physical Device (use your Mac's IP)
-// static const String base = "http://192.168.x.x:3000";
-```
-
-## 🔧 Important Files
-
-- `backend/server.js` - Express API with `/sync` endpoint
-- `chat_flutter/lib/screens/chat_screen.dart` - Main UI
-- `chat_flutter/lib/services/sync_service.dart` - Sync logic
-- `chat_flutter/lib/hive/hive_manager.dart` - Local storage
+- iOS Simulator: `http://localhost:3000`
+- Android Emulator: `http://10.0.2.2:3000`
+- Physical Device: `http://YOUR_IP:3000`
 
 ## 📡 API
 
-**POST /sync**
-```json
-Request: { "localMessages": [...], "lastSyncTime": "ISO-8601" }
-Response: { "success": true, "serverMessages": [...] }
+```text
+POST /sync
+Request: { localMessages: [...], lastSyncTime: "ISO" }
+Response: { success: true, serverMessages: [...] }
 ```
 
-## 🧪 Test Offline Mode
+## 🧪 Test Offline
 
-**iOS Simulator**: Settings → Developer → Network Link Conditioner → 100% Loss
-
-**Android Emulator**: Extended Controls (...) → Settings → Cellular → None
-
-## 💡 Tips
-
-- Open `ios/Runner.xcworkspace` (not .xcodeproj) when using Xcode
-- For physical devices, change bundle ID in `project.pbxproj`
-- Ensure both devices on same WiFi network
+- **iOS:** Settings → Developer → Network → 100% Loss
+- **Android:** Extended Controls → Settings → Cellular → None
 
 ---
 
-**Built with Flutter & Node.js**
+Built with Flutter & SQLite
