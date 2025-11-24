@@ -8,9 +8,10 @@ class ApiService {
   // Physical Device: use your computer's IP (e.g., "http://192.168.18.32:3000")
 
   // 👇 Change this based on what you're using:
-  static const String base = "http://localhost:3000"; // ← For iOS Simulator
+  // static const String base = "http://localhost:3000"; // ← For iOS Simulator
   // static const String base = "http://10.0.2.2:3000";  // ← For Android Emulator
-  // static const String base = "http://192.168.18.32:3000";  // ← For Physical Device
+  static const String base =
+      "http://192.168.18.32:3000"; // ← For Physical Device
 
   // Sync endpoint
   // Expects { localMessages: [...], lastSyncTime: "ISO" }
